@@ -15,6 +15,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMa
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, ConversationHandler
 import sqlite3
 import datetime
+import json
+import functions as fs
 
 con = sqlite3.connect('Amiko.db', check_same_thread=False)
 cur=con.cursor()
@@ -24,16 +26,8 @@ markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False, resize_key
     
 def start (bot, update):
     user_id = bot.message.from_user.id
-    if (cur.execute("SELECT IdUser FROM Users WHERE IdUser=?",(user_id,)).fetchone() is None) :
-        num=bot.message.from_user.username
-        cur.execute("INSERT INTO Users (IdUser,Username) VALUES (?,?)",(str(user_id) , str(num))),
-        con.commit()
-    else:
-        num=bot.message.from_user.username
-        cur.execute("UPDATE Users SET Username=? WHERE IdUser=?", (num,user_id,))
-        con.commit()
-
-
+    num=bot.message.from_user.username
+    fs.addUser(user_id, num)
     bot.message.reply_text(f'Приветик, {bot.effective_user.first_name}, я трейд Бот Амико! Ты можешь создавать объявления или просматривать их, для этого нажми на соответствующую панель в меню, или напиши ручками "Создать" или "Просмотреть"', reply_markup=markup)
 
 def review (bot, context: CallbackContext):
@@ -44,8 +38,10 @@ def review (bot, context: CallbackContext):
     
     
 def showRes(bot, context: CallbackContext):
-    if (bot.message.text!='Электроника 📱' and bot.message.text!='Игрушки 🧸' and bot.message.text!='Животные 🐶' and bot.message.text!='Другое 🤔'):
-        bot.message.reply_text('Ну нет, выбери уже существующие тэги!')
+    tag=bot.message.text
+    check=fs.tagCheck(tag)
+    if(check is not None):
+        bot.message.reply_text(check)
         return 1
     reply_keyboard = [['/create', '/review'], ['/update']]
     tag=bot.message.text
@@ -61,6 +57,12 @@ def showRes(bot, context: CallbackContext):
 #  bot.message.reply_photo(value[1], caption = value[0] +'\n' + '\n'+value[2] +'\n' + '\n'+"Ссылка на создателя объявления: "+'@'+value2[0])       
 def update(update, context: CallbackContext):
     user_id = update.message.from_user.id
+    if (cur.execute("SELECT Name, PhotoId, Description FROM Offers WHERE UserId = ?", (user_id,)).fetchone() is None) :
+        reply_keyboard = [['/create', '/review'], ['/update']]
+        markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False, resize_keyboard=False)
+        update.message.reply_text(f'У вас нет ни одного объявления!',reply_markup=markup)
+        return ConversationHandler.END
+    
     # for value in cur.execute("SELECT Name, PhotoId, Description FROM Offers WHERE UserId = ?", (user_id,)) :
     #     markupp = InlineKeyboardMarkup([[InlineKeyboardButton("Тыкни меня!",'https://vk.com/feed'),InlineKeyboardButton("И снова!!!",'https://vk.com/feed')]])
     #     update.message.reply_photo(value[1], caption = value[0] +'\n' + '\n'+value[2],reply_markup = markupp)
@@ -68,11 +70,9 @@ def update(update, context: CallbackContext):
         'Хорошо, давайте просмотрим все Ваши объявления! Выберите то, которое хотите отредактировать (Отправь цифру!)',
         reply_markup=ReplyKeyboardRemove(),
     )
-    counter=1;
-    for value in cur.execute("SELECT Name, PhotoId, Description FROM Offers WHERE UserId = ?", (user_id,)) :
 
-        update.message.reply_text(f'{counter}. {value[0]}')
-        counter=counter+1;
+    update.message.reply_text(fs.showUrOff(user_id))
+
     return 1
 
 def choosedOffer(bot, context: CallbackContext):
@@ -135,71 +135,50 @@ def nameUpdate(bot, context: CallbackContext):
         if (answer.lower()==value[1].lower()):
             bot.message.reply_text("У вас уже существует такой товар! Придумайте что-то другое")
             return 3
-    for value in cur.execute("SELECT * FROM Buffer WHERE UserId=?", (user_id,)) :
-        cur.execute("UPDATE Offers SET Name=? WHERE UserId=? AND PhotoId=? AND Description=? AND DateTime=?", (answer,value[0],value[2],value[3],value[4]))
-        con.commit();
-        cur.execute("UPDATE Buffer SET Name=? WHERE UserId=?",(answer, value[0]))
-        con.commit();
-        
-    for value in cur.execute("SELECT * FROM Buffer WHERE UserId=?", (user_id,)) :
-        reply_keyboard = [['Название', 'Фото', 'Описание', 'Тэг'], ['Удалить Объявление'],['Назад']]
-        markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False, resize_keyboard=False)
-        bot.message.reply_text("Имя обновлено! Желаете поменять что-нибудь ещё в этом объявлении?",reply_markup = markup)
-        bot.message.reply_photo(value[2], caption = value[1] +'\n' + '\n'+value[3] +'\n'+ '\n'+'Тэг: '+value[5])
-        return 2
+    update=fs.updateOff(user_id,"name", answer)
+    reply_keyboard = [['Название', 'Фото', 'Описание', 'Тэг'], ['Удалить Объявление'],['Назад']]
+    markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False, resize_keyboard=False)
+    bot.message.reply_text(update[0],reply_markup = markup)
+    bot.message.reply_photo(update[1][0], caption = update[1][1])
+    return 2
 
 def photoUpdate(bot, context: CallbackContext):
     user_id=bot.message.from_user.id
     answer=bot.message.photo[0].file_id
-
-    for value in cur.execute("SELECT * FROM Buffer WHERE UserId=?", (user_id,)) :
-        cur.execute("UPDATE Offers SET PhotoId=? WHERE UserId=? AND Name=? AND Description=? AND DateTime=?", (answer,value[0],value[1],value[3],value[4]))
-        con.commit();
-        cur.execute("UPDATE Buffer SET PhotoId=? WHERE UserId=?",(answer, user_id))
-        con.commit();
     
-    for value in cur.execute("SELECT * FROM Buffer WHERE UserId=?", (user_id,)) : 
-        reply_keyboard = [['Название', 'Фото', 'Описание', 'Тэг'], ['Удалить Объявление'],['Назад']]
-        markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False, resize_keyboard=False)
-        bot.message.reply_text("Фото обновлено! Желаете поменять что-нибудь ещё в этом объявлении?",reply_markup = markup)
-        bot.message.reply_photo(value[2], caption = value[1] +'\n' + '\n'+value[3] +'\n'+ '\n'+'Тэг: '+value[5])
-        return 2
+    update=fs.updateOff(user_id,"photo", answer)
+    reply_keyboard = [['Название', 'Фото', 'Описание', 'Тэг'], ['Удалить Объявление'],['Назад']]
+    markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False, resize_keyboard=False)
+    bot.message.reply_text(update[0],reply_markup = markup)
+    bot.message.reply_photo(update[1][0], caption = update[1][1])
+
+    return 2
     
 def descrUpdate(bot, context: CallbackContext):
     user_id=bot.message.from_user.id
     answer=bot.message.text
 
-    for value in cur.execute("SELECT * FROM Buffer WHERE UserId=?", (user_id,)) :
-        cur.execute("UPDATE Offers SET Description=? WHERE UserId=? AND PhotoId=? AND Name=? AND DateTime=?", (answer,value[0],value[2],value[1],value[4]))
-        con.commit();
-        cur.execute("UPDATE Buffer SET Descr=? WHERE UserId=?",(answer, value[0]))
-        con.commit();
-        
-    for value in cur.execute("SELECT * FROM Buffer WHERE UserId=?", (user_id,)) :
-        reply_keyboard = [['Название', 'Фото', 'Описание', 'Тэг'], ['Удалить Объявление'],['Назад']]
-        markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False, resize_keyboard=False)
-        bot.message.reply_text("Описание обновлено! Желаете поменять что-нибудь ещё в этом объявлении?",reply_markup = markup)
-        bot.message.reply_photo(value[2], caption = value[1] +'\n' + '\n'+value[3] +'\n'+ '\n'+'Тэг: '+value[5])
-        return 2
+    update=fs.updateOff(user_id,"descr", answer)
+    reply_keyboard = [['Название', 'Фото', 'Описание', 'Тэг'], ['Удалить Объявление'],['Назад']]
+    markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False, resize_keyboard=False)
+    bot.message.reply_text(update[0],reply_markup = markup)
+    bot.message.reply_photo(update[1][0], caption = update[1][1])
+    return 2
     
 def tagUpdate(bot, context: CallbackContext):
-    if (bot.message.text!='Электроника 📱' and bot.message.text!='Игрушки 🧸' and bot.message.text!='Животные 🐶' and bot.message.text!='Другое 🤔'):
-        bot.message.reply_text('Ну нет, выбери уже существующие тэги!')
+    tag=bot.message.text
+    check=fs.tagCheck(tag)
+    if(check is not None):
+        bot.message.reply_text(check)
         return 6
     user_id=bot.message.from_user.id
     answer=bot.message.text
-    for value in cur.execute("SELECT * FROM Buffer WHERE UserId=?", (user_id,)) :
-        cur.execute("UPDATE Offers SET Tag=? WHERE UserId=? AND PhotoId=? AND Name=? AND Description =? AND DateTime=?", (answer,value[0],value[2],value[1],value[3],value[4]))
-        con.commit();
-        cur.execute("UPDATE Buffer SET Tag=? WHERE UserId=?",(answer, value[0]))
-        con.commit();
-        
-    for value in cur.execute("SELECT * FROM Buffer WHERE UserId=?", (user_id,)) :
-        reply_keyboard = [['Название', 'Фото', 'Описание', 'Тэг'], ['Удалить Объявление'],['Назад']]
-        markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False, resize_keyboard=False)
-        bot.message.reply_text("Тэг обновлён! Желаете поменять что-нибудь ещё в этом объявлении?",reply_markup = markup)
-        bot.message.reply_photo(value[2], caption = value[1] +'\n' + '\n'+value[3] +'\n'+ '\n'+'Тэг: '+value[5])
-        return 2
+    update=fs.updateOff(user_id,"tag", answer)
+    reply_keyboard = [['Название', 'Фото', 'Описание', 'Тэг'], ['Удалить Объявление'],['Назад']]
+    markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False, resize_keyboard=False)
+    bot.message.reply_text(update[0],reply_markup = markup)
+    bot.message.reply_photo(update[1][0], caption = update[1][1])
+    return 2
 
 def deleteOffer(bot,context: CallbackContext):
     if (bot.message.text=="Да") :
@@ -269,8 +248,10 @@ def desc(bot, update):
     return 5
 
 def tag(bot,update):
-    if (bot.message.text!='Электроника 📱' and bot.message.text!='Игрушки 🧸' and bot.message.text!='Животные 🐶' and bot.message.text!='Другое 🤔'):
-        bot.message.reply_text('Ну нет, выбери уже существующие тэги!')
+    tag=bot.message.text
+    check=fs.tagCheck(tag)
+    if(check is not None):
+        bot.message.reply_text(check)
         return 5
     tag=bot.message.text
     user_id=bot.message.from_user.id
@@ -329,9 +310,9 @@ def hello(update, context: CallbackContext) -> None:
 
 def ping(update, context: CallbackContext) :
     update.message.reply_text(f'Pong')
-    update.message.reply_text(f'It took' )
+    print("Pong")
     
-updater = Updater('Enter Your Token')
+updater = Updater('5062644159:AAEuA2VFq1cvuOiup3xLodw-0bSp43gEaNM')
 
 dp = updater.dispatcher
 
