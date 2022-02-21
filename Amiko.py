@@ -312,7 +312,7 @@ def ping(update, context: CallbackContext) :
     update.message.reply_text(f'Pong')
     print("Pong")
     
-updater = Updater('5062644159:AAEuA2VFq1cvuOiup3xLodw-0bSp43gEaNM')
+updater = Updater('YourToken')
 
 dp = updater.dispatcher
 
