@@ -18,7 +18,9 @@ jobs:
         with:
           python-version: '3.10'
           architecture: 'x64'
-
+      - name: Install requirements
+        # Устанавливаем зависимости
+        run: pip install coverage
       - name: Run tests
         run: coverage run test_amiko.py
       - name: Tests report
