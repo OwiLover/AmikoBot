@@ -3,10 +3,10 @@ name: Run tests on any Push event
 # Они будт тестироваться перед сборкой
 on:
   push:
-    tags:
-      - '!refs/tags/*'
-    branches:
-      - '*'
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
 jobs:
   run_tests:
     runs-on: [ubuntu-latest]
@@ -26,3 +26,10 @@ jobs:
       - name: Tests report
         run: coverage report
 
+      - name: Build and Push Docker Image
+        uses: mr-smithers-excellent/docker-build-push@v5
+        with:
+          image: owilover/AmikoBot
+          registry: docker.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
