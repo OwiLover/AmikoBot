@@ -3,9 +3,9 @@ name: Run tests on any Push event
 # Они будт тестироваться перед сборкой
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   run_tests:
