@@ -22,7 +22,7 @@ jobs:
         # Устанавливаем зависимости
         run: pip install coverage
       - name: Run tests
-        run: coverage run test_amiko.py
+        run: coverage run src/test_amiko.py
       - name: Tests report
         run: coverage report
 
