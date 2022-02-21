@@ -72,7 +72,6 @@ def update(update, context: CallbackContext):
     )
 
     update.message.reply_text(fs.showUrOff(user_id))
-
     return 1
 
 def choosedOffer(bot, context: CallbackContext):
