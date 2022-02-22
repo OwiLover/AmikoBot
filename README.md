@@ -29,7 +29,7 @@
 
 # Архитектурные диаграммы
 
- Ссылка на диаграммы:
+ Ссылка на диаграммы: https://drive.google.com/drive/folders/188HBYGuLS0BpsYelZ_mE2MOo3i2bpiud?usp=sharing
 
 # Скриншоты работы приложения
- Ссылка на скриншоты:
+ Ссылка на скриншоты: https://drive.google.com/drive/folders/1hPq0ZyjL8CN9Ba-nYQpf-IDTBe8S8oBE?usp=sharing
